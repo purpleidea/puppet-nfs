@@ -1,0 +1,44 @@
+<% if ipa != '' -%>
+#File modified by ipa-client-install
+
+includedir /var/lib/sss/pubconf/krb5.include.d/
+<% end -%>
+
+<% if ipa == '' -%>
+<%# ipa doesn't seem to include this logging section in it's template -%>
+[logging]
+ default = FILE:/var/log/krb5libs.log
+ kdc = FILE:/var/log/krb5kdc.log
+ admin_server = FILE:/var/log/kadmind.log
+<% end -%>
+
+[libdefaults]
+  default_realm = <%= domain.upcase %>
+  dns_lookup_realm = false
+  dns_lookup_kdc = false
+<% if ipa != '' -%>
+  rdns = false
+<% end -%>
+  ticket_lifetime = 24h
+<% if ipa == '' -%>
+  renew_lifetime = 7d
+<% end -%>
+  forwardable = <% if ipa == '' %>true<% else %>yes<% end %>
+
+[realms]
+  <%= domain.upcase %> = {
+<% if ipa = '' -%>
+    kdc = <%= kerberos %>.<%= domain.downcase %>
+    admin_server = <%= kerberos %>.<%= domain.downcase %>
+<% else -%>
+    kdc = <%= kerberos %>.<%= domain.downcase %>:88
+    master_kdc = <%= kerberos %>.<%= domain.downcase %>:88
+    admin_server = <%= kerberos %>.<%= domain.downcase %>:749
+    default_domain = <%= domain.downcase %>
+    pkinit_anchors = FILE:/etc/ipa/ca.crt
+<% end -%>
+  }
+
+[domain_realm]
+  .<%= domain.downcase %> = <%= domain.upcase %>
+  <%= domain.downcase %> = <%= domain.upcase %>

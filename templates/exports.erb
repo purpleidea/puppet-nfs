@@ -1,0 +1,20 @@
+#
+#       This is an /etc/exports fragment for: <%= name %>
+#
+<% if comment != '' -%>
+#	<%= comment %>
+#
+<% end -%>
+<% if manual != '' -%>
+<%= manual %>
+<% else -%>
+<% if valid_hosts.is_a?(Array) and valid_hosts != [] -%>
+<%# The format here is very precise, particularly in regards to use of the space character. -%>
+#<%= valid_export %> -<%= valid_options %> <%= valid_hosts.join(' ') %>	# same
+<%= valid_export %><% valid_hosts.each do |x| %> <%= x %>(<%= valid_options %>)<% end %>
+<% end -%>
+<% if valid_raw.is_a?(Hash) and valid_raw != {} -%>
+<%= valid_export %><% valid_raw.keys.sort.each do |k| -%> <%= k %><% if valid_raw[k].is_a?(Array) and valid_raw[k].length > 0 %>(<%= valid_raw[k].join(',') %>)<% end %><% end %>
+<% end -%>
+<% end -%>
+
