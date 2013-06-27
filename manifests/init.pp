@@ -15,7 +15,10 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-# XXX: is this the right way to do this? why do i even need to import this ?
+# TODO: using import is not recommended, and this import should be replaced.
+# the reason that it's being used is it is currently the only way to include
+# top level types that are written in puppet code (not ruby) without putting
+# each of them in a separate top level module that has that associated name.
 import 'common'			# include my puppet-common define's and classes
 
 # TODO: manipulate the firewall to whitelist client ips by collected resources!
