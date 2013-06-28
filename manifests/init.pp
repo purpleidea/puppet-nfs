@@ -241,6 +241,12 @@ class nfs::server(
 		shorewall::rule { 'nfs': rule => "
 		ACCEPT  ${net}    $FW    tcp  2049
 		", comment => 'Allow NFSv4 over tcp.'}
+
+		# not used for nfsv4
+		#shorewall::rule { 'rpcbind': rule => "
+		#ACCEPT  ${net}    $FW    tcp  111
+		#ACCEPT  ${net}    $FW    udp  111
+		#", comment => 'Allow rpcbind over tcp/udp.'}
 	}
 }
 
@@ -435,7 +441,11 @@ define nfs::server::export(
 
 class nfs::client(
 	$domain = $::domain,		# defaults to facter fact
-	$kerberos = ''
+	$kerberos = '',
+	$callback_port = 32764,		# arbitrary	# TODO: what is best ?
+	$shorewall = false,
+	$zone = 'net',
+	$allow = 'all'
 ) {
 	include nfs::package
 	include nfs::rpcbind
@@ -486,6 +496,14 @@ class nfs::client(
 		require => Package['nfs-utils'],
 	}
 
+	# useful for NFSv4, version 4.1 doesn't need or use this...
+	file { '/etc/modprobe.d/nfs-options-local.conf':	# TODO: does filename matter ?
+		content => "options nfs callback_tcpport=${callback_port}\n",
+		owner => root, group => root, mode => 644, backup => false,
+		ensure => present,
+		require => Package['nfs-utils'],	# require nfs exist :)
+	}
+
 	# FIXME: is this only needed with kerberos or does it have other uses ?
 	if $bool_kerberos {
 		# will not start without SECURE_NFS="yes" in /etc/sysconfig/nfs
@@ -506,6 +524,29 @@ class nfs::client(
 		hasrestart => true,		# use restart, not start; stop
 		require => Package['nfs-utils'],	# this comes from here
 	}
+
+	# FIXME: consider allowing only certain ip's to the nfs server
+	if $shorewall {
+		if $allow == 'all' {
+			$net = "${zone}"
+		} else {
+			$net = is_array($allow) ? {
+				true => sprintf("${zone}:%s", join($allow, ',')),
+				default => "${zone}:${allow}",
+			}
+		}
+		####################################################################
+		#ACTION      SOURCE DEST                PROTO DEST  SOURCE  ORIGINAL
+		#                                             PORT  PORT(S) DEST
+
+		# the server really does open a connection TO the client...
+		# the nfs mailing list said it's okay if it doesn't work...
+		if "${callback_port}" != '' {
+			shorewall::rule { 'nfs': rule => "
+			ACCEPT  ${net}    $FW    tcp  ${callback_port}
+			", comment => 'Allow NFSv4 from server to client.'}
+		}
+	}
 }
 
 define nfs::client::mount(
@@ -519,7 +560,7 @@ define nfs::client::mount(
 	$clientaddr = '',
 	$options = [],			# add on these additional options
 	# TODO: is _netdev required or suggested ?
-	$option_defaults = ['hard', 'fg', '_netdev'],	# override if you want!
+	$option_defaults = ['vers=4', 'hard', 'fg', '_netdev'],	# override if you want!
 	$mounted = true,
 	$ipa = '',			# the ipa service this corresponds to
 	$comment = ''			# TODO: this is unused...

@@ -41,6 +41,7 @@ nfs::server::export { '/homes/':	# name is the client mountpoint
 # and here is how you can collect / mount ~automatically on the client:
 class { '::nfs::client':
 	kerberos => true,
+	shorewall => true,		# open up fw for callback port!
 }
 
 nfs::client::mount::collect { 'homes':	# match the $tagas from export!
