@@ -227,7 +227,7 @@ class nfs::server(
 
 	# FIXME: consider allowing only certain ip's to the nfs server
 	if $shorewall {
-		if $allow == 'all' {
+		if $allow == 'all' or "${allow}" == '' {
 			$net = "${zone}"
 		} else {
 			$net = is_array($allow) ? {
@@ -527,7 +527,7 @@ class nfs::client(
 
 	# FIXME: consider allowing only certain ip's to the nfs server
 	if $shorewall {
-		if $allow == 'all' {
+		if $allow == 'all' or "${allow}" == '' {
 			$net = "${zone}"
 		} else {
 			$net = is_array($allow) ? {
