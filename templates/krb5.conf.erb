@@ -27,7 +27,7 @@ includedir /var/lib/sss/pubconf/krb5.include.d/
 
 [realms]
   <%= domain.upcase %> = {
-<% if ipa = '' -%>
+<% if ipa == '' -%>
     kdc = <%= kerberos %>.<%= domain.downcase %>
     admin_server = <%= kerberos %>.<%= domain.downcase %>
 <% else -%>
