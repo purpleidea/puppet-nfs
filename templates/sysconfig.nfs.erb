@@ -58,15 +58,15 @@
 #RPCIDMAPDARGS=""
 #
 # Set to turn on Secure NFS mounts.
-<% if secure_nfs == '' -%>
+<% if @secure_nfs == '' -%>
 #SECURE_NFS="yes"
 <% else -%>
-SECURE_NFS="<%= secure_nfs %>"
+SECURE_NFS="<%= @secure_nfs %>"
 <% end -%>
 # Optional arguments passed to rpc.gssd. See rpc.gssd(8)
-#RPCGSSDARGS="<% if debug %>-vvv<% end %>"
+#RPCGSSDARGS="<% if @debug %>-vvv<% end %>"
 # Optional arguments passed to rpc.svcgssd. See rpc.svcgssd(8)
-#RPCSVCGSSDARGS="<% if debug %>-vvv<% end %>"
+#RPCSVCGSSDARGS="<% if @debug %>-vvv<% end %>"
 #
 # To enable RDMA support on the server by setting this to
 # the port the server should listen on
