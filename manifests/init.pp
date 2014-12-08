@@ -57,23 +57,61 @@ import 'common'			# include my puppet-common define's and classes
 #	}
 #}
 
+class nfs::params(
+	# package names
+	$package_nfs_utils = 'nfs-utils',
+	$package_rpcbind = 'rpcbind',
+
+	# service names
+	$service_nfs = 'nfs',
+	$service_rpcbind = 'rpcbind',
+	$service_rpcidmapd = 'rpcidmapd',
+	$service_rpcgssd = 'rpcgssd',
+
+	# program names
+	$program_exportfs = '/usr/sbin/exportfs',
+	$program_modprobe = '/sbin/modprobe',
+	$program_lsmod = '/sbin/lsmod',
+	$program_grep = '/bin/grep',
+
+	# path to files
+	$path_to_krb5_config = '/etc/krb5.conf',
+	$path_to_idmapd_config = '/etc/idmapd.conf',
+	$path_to_nfs_config = '/etc/sysconfig/nfs',
+	$path_to_exports = '/etc/exports',
+	$path_to_exports_d = '/etc/exports.d/',
+	$path_to_modprobe_d = '/etc/modprobe.d/',
+
+	# misc options
+	$misc_has_exports_dot_d = false,
+
+	# comment to check whether hiera is working
+	$comment = ''
+) {
+	if "${comment}" == '' {
+		warning('Unable to load yaml data/ directory!')
+	}
+}
+
 class nfs::package() {
-	package { 'nfs-utils':
+	include nfs::params
+	package { "${::nfs::params::package_nfs_utils}":
 		ensure => present,
 	}
 }
 
 class nfs::rpcbind() {
-	package { 'rpcbind':
+	include nfs::params
+	package { "${::nfs::params::package_rpcbind}":
 		ensure => present,
 	}
 
-	service { 'rpcbind':
+	service { "${::nfs::params::service_rpcbind}":
 		enable => true,			# start on boot
 		ensure => running,		# ensure it stays running
 		hasstatus => true,		# use status command to monitor
 		hasrestart => true,		# use restart, not start; stop
-		require => Package['rpcbind'],	# this is a dep. of: nfs-utils
+		require => Package["${::nfs::params::package_rpcbind}"],	# this is a dep. of: nfs-utils
 	}
 }
 
@@ -88,6 +126,7 @@ class nfs::server(
 	$debug = false			# add -vvv flags to your sysconfig
 ) {
 	$FW = '$FW'			# make using $FW in shorewall easier
+	include nfs::params
 	include nfs::package
 	include nfs::rpcbind
 	#include nfs::vardir
@@ -107,24 +146,13 @@ class nfs::server(
 		default => 'yes',
 	}
 
-	# does exportfs support looking in /etc/exports.d/*.exports ?
-	$has_exports_dot_d = $operatingsystem ? {
-		# TODO: add RHEL...
-		'CentOS' => $operatingsystemrelease ? {
-			6.4 => false,
-			#7.0 => true,	# TODO ?
-			default => false,	# unknown
-		},
-		default => false,		# unknown
-	}
-
 	# if we're not using using ipa, we need to supply this file...
 	if "${ipa}" == '' {
-		file { '/etc/krb5.conf':
+		file { "${::nfs::params::path_to_krb5_config}":
 			content => template('nfs/krb5.conf.erb'),
 			owner => root, group => root, mode => 644, backup => false,
-			before => Service['nfs'],
-			require => Package['nfs-utils'],
+			before => Service["${::nfs::params::service_nfs}"],
+			require => Package["${::nfs::params::package_nfs_utils}"],
 			ensure => $kerberos ? {
 				'' => absent,
 				default => present,
@@ -134,81 +162,81 @@ class nfs::server(
 		# TODO: if we want to manage it here, it should be safe to do
 	}
 
-	file { '/etc/idmapd.conf':
+	file { "${::nfs::params::path_to_idmapd_config}":
 		content => template('nfs/idmapd.conf.erb'),
 		owner => root, group => root, mode => 644, backup => false,
 		ensure => present,
-		require => Package['nfs-utils'],
+		require => Package["${::nfs::params::package_nfs_utils}"],
 	}
 
-	file { '/etc/sysconfig/nfs':
+	file { "${::nfs::params::path_to_nfs_config}":
 		content => template('nfs/sysconfig.nfs.erb'),
 		owner => root, group => root, mode => 644, backup => false,
 		ensure => present,
-		require => Package['nfs-utils'],
+		require => Package["${::nfs::params::package_nfs_utils}"],
 	}
 
-	$message = "# This file and /etc/exports.d/ are managed by puppet.\n"
-	if $has_exports_dot_d {
-		file { '/etc/exports':
+	$message = "# This file and ${::nfs::params::path_to_exports_d} are managed by puppet.\n"
+	if $::nfs::params::misc_has_exports_dot_d {
+		file { "${::nfs::params::path_to_exports}":
 			content => $message,
 			owner => root,
 			group => root,
 			mode => 644,
 			backup => false,
 			ensure => present,
-			before => Service['nfs'],
+			before => Service["${::nfs::params::service_nfs}"],
 			notify => Exec['exportfs'],
-			require => Package['nfs-utils'],
+			require => Package["${::nfs::params::package_nfs_utils}"],
 		}
 	} else {
 		# NOTE: we might as well use /etc/exports.d/ as the collect dir
-		whole { '/etc/exports':
-			dir => '/etc/exports.d/',
+		whole { "${::nfs::params::path_to_exports}":
+			dir => "${::nfs::params::path_to_exports_d}",
 			pattern => '*.exports',	# only include files that match
 			owner => root,
 			group => root,
 			mode => 644,
 			backup => false,
 			ensure => present,
-			before => Service['nfs'],
+			before => Service["${::nfs::params::service_nfs}"],
 			notify => Exec['exportfs'],
-			require => Package['nfs-utils'],
+			require => Package["${::nfs::params::package_nfs_utils}"],
 		}
 
-		file { '/etc/exports.d/README':
+		file { "${::nfs::params::path_to_exports_d}README":
 			content => $message,
 			owner => root,
 			group => root,
 			mode => 644,
 			backup => false,
 			ensure => present,
-			require => File['/etc/exports.d/'],	# from whole{}
+			require => File["${::nfs::params::path_to_exports_d}"],	# from whole{}
 		}
 	}
 
 	$require = $ipa ? {
 		'' => [
-			Service['rpcbind'],	# otherwise we get the error:
+			Service["${::nfs::params::service_rpcbind}"],	# otherwise we get the error:
 			# Starting NFS daemon: rpc.nfsd: writing fd to kernel
 			# failed: errno 111 (Connection refused)
 			#File['/etc/krb5.conf'],
-			File['/etc/idmapd.conf'],
-			File['/etc/sysconfig/nfs'],
+			File["${::nfs::params::path_to_idmapd_config}"],
+			File["${::nfs::params::path_to_nfs_config}"],
 		],
 		default => [
 			Ipa::Client::Service["${ipa}"],	# need the ipa service
-			Service['rpcbind'],
-			#File['/etc/krb5.conf'],
-			File['/etc/idmapd.conf'],
-			File['/etc/sysconfig/nfs'],
+			Service["${::nfs::params::service_rpcbind}"],
+			#File["${::nfs::params::path_to_krb5_config}"],
+			File["${::nfs::params::path_to_idmapd_config}"],
+			File["${::nfs::params::path_to_nfs_config}"],
 		],
 	}
 
 	# TODO: service nfslock ?
 	# starting this service causes rpc.svcgssd to start (for it is used for
 	# krb5) but it will exit without SECURE_NFS="yes" in /etc/sysconfig/nfs
-	service { 'nfs':
+	service { "${::nfs::params::service_nfs}":
 		enable => true,			# start on boot
 		ensure => running,		# ensure it stays running
 		hasstatus => true,		# use status command to monitor
@@ -218,10 +246,10 @@ class nfs::server(
 	}
 
 	# reexport all dirs, synchronizing /var/lib/nfs/etab with /etc/exports.
-	exec { '/usr/sbin/exportfs -r':
+	exec { "${::nfs::params::program_exportfs} -r":
 		logoutput => on_failure,
 		refreshonly => true,
-		require => Package['nfs-utils'],
+		require => Package["${::nfs::params::package_nfs_utils}"],
 		alias => 'exportfs',
 	}
 
@@ -390,7 +418,6 @@ define nfs::server::export(
 
 	$valid_options = inline_template('<%= (options_array+options_other).delete_if {|x| x.empty? }.join(",") %>')
 
-	$has_exports_dot_d = $nfs::server::has_exports_dot_d
 	# NOTE: creating a uid with no slashes instead of using $name directly,
 	# is needed, so that $name can be used as a mount value. Unfortunately,
 	# the uniqueness required here in the frag $name can't contain slashes!
@@ -400,21 +427,21 @@ define nfs::server::export(
 	$uid = sprintf("x%sx", regsubst($name, '/', '-', 'G'))	# replace / w -
 
 	# format: export host1(options1) host2(options2) hostN(optionsN)
-	if $has_exports_dot_d {
-		file { "/etc/exports.d/${uid}.exports":
+	if $::nfs::params::misc_has_exports_dot_d {
+		file { "${::nfs::params::path_to_exports_d}${uid}.exports":
 			content => template('nfs/exports.erb'),
 			owner => root, group => root, mode => 644, backup => false,
 			ensure => present,
 			notify => Exec['exportfs'],
-			before => Service['nfs'],	# TODO: is this okay ?
-			require => File['/etc/exports.d/'],
+			before => Service["${::nfs::params::service_nfs}"],	# TODO: is this okay ?
+			require => File["${::nfs::params::path_to_exports_d}"],
 		}
 	} else {
-		frag { "/etc/exports.d/${uid}.exports":
+		frag { "${::nfs::params::path_to_exports_d}${uid}.exports":
 			content => template('nfs/exports.erb'),
 			owner => root, group => root, mode => 644, backup => false,
 			ensure => present,
-			require => Package['nfs-utils'],
+			require => Package["${::nfs::params::package_nfs_utils}"],
 		}
 	}
 
@@ -447,6 +474,7 @@ class nfs::client(
 	$zone = 'net',
 	$allow = 'all'
 ) {
+	include nfs::params
 	include nfs::package
 	include nfs::rpcbind
 
@@ -474,55 +502,55 @@ class nfs::client(
 		# error messages without the modprobe were:
 		# kernel: RPC: Couldn't create auth handle (flavor 390004)
 		# kernel: gss_create: Pseudoflavor 390004 not found!
-		exec { '/sbin/modprobe rpcsec_gss_krb5':
+		exec { "${::nfs::params::program_modprobe} rpcsec_gss_krb5":
 			logoutput => on_failure,
-			unless => "/sbin/lsmod | /bin/grep -q '^rpcsec_gss_krb5'",
+			unless => "${::nfs::params::program_lsmod} | ${::nfs::params::program_grep} -q '^rpcsec_gss_krb5'",
 			alias => 'modprobe-rpcsec_gss_krb5',
 		}
 	}
 
-	file { '/etc/idmapd.conf':
+	file { "${::nfs::params::path_to_idmapd_config}":
 		content => template('nfs/idmapd.conf.erb'),
 		owner => root, group => root, mode => 644, backup => false,
 		ensure => present,
-		before => Service['rpcidmapd'],	# TODO: is this even necessary?
-		require => Package['nfs-utils'],
+		before => Service["${::nfs::params::service_rpcidmapd}"],	# TODO: is this even necessary?
+		require => Package["${::nfs::params::package_nfs_utils}"],
 	}
 
-	file { '/etc/sysconfig/nfs':
+	file { "${::nfs::params::path_to_nfs_config}":
 		content => template('nfs/sysconfig.nfs.erb'),
 		owner => root, group => root, mode => 644, backup => false,
 		ensure => present,
-		require => Package['nfs-utils'],
+		require => Package["${::nfs::params::package_nfs_utils}"],
 	}
 
 	# useful for NFSv4, version 4.1 doesn't need or use this...
-	file { '/etc/modprobe.d/nfs-options-local.conf':	# TODO: does filename matter ?
+	file { "${::nfs::params::path_to_modprobe_d}nfs-options-local.conf":	# TODO: does filename matter ?
 		content => "options nfs callback_tcpport=${callback_port}\n",
 		owner => root, group => root, mode => 644, backup => false,
 		ensure => present,
-		require => Package['nfs-utils'],	# require nfs exist :)
+		require => Package["${::nfs::params::package_nfs_utils}"],	# require nfs exist :)
 	}
 
 	# FIXME: is this only needed with kerberos or does it have other uses ?
 	if $bool_kerberos {
 		# will not start without SECURE_NFS="yes" in /etc/sysconfig/nfs
-		service { 'rpcgssd':
+		service { "${::nfs::params::service_rpcgssd}":
 			enable => true,			# start on boot
 			ensure => running,		# ensure it stays running
 			hasstatus => true,		# use status command to monitor
 			hasrestart => true,		# use restart, not start; stop
-			require => File['/etc/sysconfig/nfs'],
+			require => File["${::nfs::params::path_to_nfs_config}"],
 		}
 	}
 
 	# TODO: is this needed if we're not using kerberos ?
-	service { 'rpcidmapd':
+	service { "${::nfs::params::service_rpcidmapd}":
 		enable => true,			# start on boot
 		ensure => running,		# ensure it stays running
 		hasstatus => true,		# use status command to monitor
 		hasrestart => true,		# use restart, not start; stop
-		require => Package['nfs-utils'],	# this comes from here
+		require => Package["${::nfs::params::package_nfs_utils}"],	# this comes from here
 	}
 
 	# FIXME: consider allowing only certain ip's to the nfs server
@@ -675,15 +703,15 @@ define nfs::client::mount(
 	$require = $nfs::client::bool_kerberos ? {
 		false => [
 			File["${slash_mount}"],
-			Service['rpcbind'],
-			#Service['rpcgssd'],	# omit
-			Service['rpcidmapd'],
+			Service["${::nfs::params::service_rpcbind}"],
+			#Service["${::nfs::params::service_rpcgssd}"],	# omit
+			Service["${::nfs::params::service_rpcidmapd}"],
 		],
 		default => [
 			File["${slash_mount}"],
-			Service['rpcbind'],
-			Service['rpcgssd'],
-			Service['rpcidmapd'],
+			Service["${::nfs::params::service_rpcbind}"],
+			Service["${::nfs::params::service_rpcgssd}"],
+			Service["${::nfs::params::service_rpcidmapd}"],
 		],
 	}
 

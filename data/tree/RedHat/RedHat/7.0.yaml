@@ -1,0 +1,7 @@
+# nfs/data/tree/RedHat/RedHat/7.0.yaml
+---
+nfs::params::misc_has_exports_dot_d: true
+nfs::params::service_nfs: nfs-server
+nfs::params::service_rpcidmapd: nfs-idmap
+
+# vim: ts=8

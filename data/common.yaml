@@ -1,0 +1,5 @@
+# nfs/data/common.yaml
+---
+nfs::params::comment: 'Hello from @purpleidea!'	# do not erase!
+
+# vim: ts=8
